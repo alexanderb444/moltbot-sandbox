@@ -265,11 +265,26 @@ if (isOpenAI) {
     config.agents.defaults.models['anthropic/claude-haiku-4-5-20251001'] = { alias: 'Haiku 4.5' };
     config.agents.defaults.model.primary = 'anthropic/claude-opus-4-5-20251101';
 } else {
-    // Default to Kimi 2.5 with reasoning enabled
+    // Default to Kimi 2.5 (Recommended, thinking enabled by default)
     config.agents.defaults.model.primary = 'moonshot/kimi-k2.5';
     config.agents.defaults.model.reasoning = 'on';
-    // Temperature 0.6: Balanced for creative marketing and logical business decisions
-    config.agents.defaults.model.temperature = 0.6;
+}
+
+// Ensure Moonshot/Kimi provider has correct maxTokens settings (Best Practice: >= 16000)
+if (config.models && config.models.providers && config.models.providers.moonshot) {
+    console.log('Updating Moonshot provider settings for best practices...');
+    const moonshot = config.models.providers.moonshot;
+    if (moonshot.models) {
+        moonshot.models = moonshot.models.map(m => {
+            if (m.id.includes('kimi')) {
+                // Ensure sufficient tokens for thinking content
+                m.maxTokens = 32000; 
+                // Kimi 2.5 uses fixed temp 1.0, defaulting context window to high
+                m.contextWindow = 200000;
+            }
+            return m;
+        });
+    }
 }
 
 // Write updated config
@@ -292,29 +307,37 @@ rm -f "$CONFIG_DIR/gateway.lock" 2>/dev/null || true
 BIND_MODE="lan"
 echo "Dev mode: ${CLAWDBOT_DEV_MODE:-false}, Bind mode: $BIND_MODE"
 
+# FIND CLAWDBOT BINARY
+CLAWDBOT_BIN=""
+if [ -f "/usr/local/bin/clawdbot" ]; then
+    CLAWDBOT_BIN="/usr/local/bin/clawdbot"
+elif [ -f "/usr/bin/clawdbot" ]; then
+    CLAWDBOT_BIN="/usr/bin/clawdbot"
+elif command -v clawdbot >/dev/null 2>&1; then
+    CLAWDBOT_BIN="$(command -v clawdbot)"
+else
+    # Try to find it via npm or other paths
+    echo "Searching for clawdbot binary..."
+    FOUND=$(find /usr -name clawdbot -type f -executable 2>/dev/null | head -n 1)
+    if [ -n "$FOUND" ]; then
+        CLAWDBOT_BIN="$FOUND"
+    fi
+fi
+
+if [ -z "$CLAWDBOT_BIN" ]; then
+    echo "ERROR: clawdbot binary not found!"
+    echo "PATH: $PATH"
+    echo "Listing /usr/local/bin:"
+    ls -la /usr/local/bin/
+    exit 127
+fi
+
+echo "Using clawdbot binary at: $CLAWDBOT_BIN"
+
 if [ -n "$CLAWDBOT_GATEWAY_TOKEN" ]; then
     echo "Starting gateway with token auth..."
-    # Try multiple ways to run clawdbot
-    if [ -f "/usr/local/bin/clawdbot" ]; then
-        exec /usr/local/bin/clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE" --token "$CLAWDBOT_GATEWAY_TOKEN"
-    elif command -v clawdbot >/dev/null 2>&1; then
-        exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE" --token "$CLAWDBOT_GATEWAY_TOKEN"
-    else
-        echo "ERROR: clawdbot binary not found in PATH or /usr/local/bin"
-        echo "PATH: $PATH"
-        ls -la /usr/local/bin/
-        exit 127
-    fi
+    exec "$CLAWDBOT_BIN" gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE" --token "$CLAWDBOT_GATEWAY_TOKEN"
 else
     echo "Starting gateway with device pairing (no token)..."
-    if [ -f "/usr/local/bin/clawdbot" ]; then
-        exec /usr/local/bin/clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE"
-    elif command -v clawdbot >/dev/null 2>&1; then
-        exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE"
-    else
-        echo "ERROR: clawdbot binary not found in PATH or /usr/local/bin"
-        echo "PATH: $PATH"
-        ls -la /usr/local/bin/
-        exit 127
-    fi
+    exec "$CLAWDBOT_BIN" gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE"
 fi
