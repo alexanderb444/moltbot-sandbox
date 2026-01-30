@@ -79,7 +79,7 @@ should_restore_from_r2() {
 if [ -f "$BACKUP_DIR/clawdbot/clawdbot.json" ]; then
     if should_restore_from_r2; then
         echo "Restoring from R2 backup at $BACKUP_DIR/clawdbot..."
-        cp -a "$BACKUP_DIR/clawdbot/." "$CONFIG_DIR/"
+        cp -r "$BACKUP_DIR/clawdbot/." "$CONFIG_DIR/" || echo "Warning: partial copy failure"
         # Copy the sync timestamp to local so we know what version we have
         cp -f "$BACKUP_DIR/.last-sync" "$CONFIG_DIR/.last-sync" 2>/dev/null || true
         echo "Restored config from R2 backup"
@@ -88,7 +88,7 @@ elif [ -f "$BACKUP_DIR/clawdbot.json" ]; then
     # Legacy backup format (flat structure)
     if should_restore_from_r2; then
         echo "Restoring from legacy R2 backup at $BACKUP_DIR..."
-        cp -a "$BACKUP_DIR/." "$CONFIG_DIR/"
+        cp -r "$BACKUP_DIR/." "$CONFIG_DIR/" || echo "Warning: partial copy failure"
         cp -f "$BACKUP_DIR/.last-sync" "$CONFIG_DIR/.last-sync" 2>/dev/null || true
         echo "Restored config from legacy R2 backup"
     fi
@@ -104,7 +104,7 @@ if [ -d "$BACKUP_DIR/skills" ] && [ "$(ls -A $BACKUP_DIR/skills 2>/dev/null)" ];
     if should_restore_from_r2; then
         echo "Restoring skills from $BACKUP_DIR/skills..."
         mkdir -p "$SKILLS_DIR"
-        cp -a "$BACKUP_DIR/skills/." "$SKILLS_DIR/"
+        cp -r "$BACKUP_DIR/skills/." "$SKILLS_DIR/" || echo "Warning: skills copy failure"
         echo "Restored skills from R2 backup"
     fi
 fi
@@ -156,6 +156,11 @@ config.agents.defaults = config.agents.defaults || {};
 config.agents.defaults.model = config.agents.defaults.model || {};
 config.gateway = config.gateway || {};
 config.channels = config.channels || {};
+
+// CLEAN UP INVALID KEYS from previous backups
+// The binary doesn't support 'reasoning' or 'temperature' in this location yet
+if (config.agents.defaults.model.reasoning) delete config.agents.defaults.model.reasoning;
+if (config.agents.defaults.model.temperature) delete config.agents.defaults.model.temperature;
 
 // Clean up any broken anthropic provider config from previous runs
 // (older versions didn't include required 'name' field)
