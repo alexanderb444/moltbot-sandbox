@@ -265,9 +265,11 @@ if (isOpenAI) {
     config.agents.defaults.models['anthropic/claude-haiku-4-5-20251001'] = { alias: 'Haiku 4.5' };
     config.agents.defaults.model.primary = 'anthropic/claude-opus-4-5-20251101';
 } else {
-    // Default to Anthropic without custom base URL (uses built-in pi-ai catalog)
-    // Default to Anthropic without custom base URL (uses built-in pi-ai catalog)
-    config.agents.defaults.model.primary = 'anthropic/claude-sonnet-4-5';
+    // Default to Kimi 2.5 with reasoning enabled
+    config.agents.defaults.model.primary = 'moonshot/kimi-k2.5';
+    config.agents.defaults.model.reasoning = 'on';
+    // Temperature 0.6: Balanced for creative marketing and logical business decisions
+    config.agents.defaults.model.temperature = 0.6;
 }
 
 // Write updated config
