@@ -8,10 +8,6 @@
 
 set -e
 
-# Ensure /usr/local/bin is in PATH
-export PATH=$PATH:/usr/local/bin
-echo "PATH is: $PATH"
-
 # Check if clawdbot gateway is already running - bail early if so
 # Note: CLI is still named "clawdbot" until upstream renames it
 if pgrep -f "clawdbot gateway" > /dev/null 2>&1; then
@@ -79,7 +75,7 @@ should_restore_from_r2() {
 if [ -f "$BACKUP_DIR/clawdbot/clawdbot.json" ]; then
     if should_restore_from_r2; then
         echo "Restoring from R2 backup at $BACKUP_DIR/clawdbot..."
-        cp -r "$BACKUP_DIR/clawdbot/." "$CONFIG_DIR/" || echo "Warning: partial copy failure"
+        cp -a "$BACKUP_DIR/clawdbot/." "$CONFIG_DIR/"
         # Copy the sync timestamp to local so we know what version we have
         cp -f "$BACKUP_DIR/.last-sync" "$CONFIG_DIR/.last-sync" 2>/dev/null || true
         echo "Restored config from R2 backup"
@@ -88,7 +84,7 @@ elif [ -f "$BACKUP_DIR/clawdbot.json" ]; then
     # Legacy backup format (flat structure)
     if should_restore_from_r2; then
         echo "Restoring from legacy R2 backup at $BACKUP_DIR..."
-        cp -r "$BACKUP_DIR/." "$CONFIG_DIR/" || echo "Warning: partial copy failure"
+        cp -a "$BACKUP_DIR/." "$CONFIG_DIR/"
         cp -f "$BACKUP_DIR/.last-sync" "$CONFIG_DIR/.last-sync" 2>/dev/null || true
         echo "Restored config from legacy R2 backup"
     fi
@@ -104,7 +100,7 @@ if [ -d "$BACKUP_DIR/skills" ] && [ "$(ls -A $BACKUP_DIR/skills 2>/dev/null)" ];
     if should_restore_from_r2; then
         echo "Restoring skills from $BACKUP_DIR/skills..."
         mkdir -p "$SKILLS_DIR"
-        cp -r "$BACKUP_DIR/skills/." "$SKILLS_DIR/" || echo "Warning: skills copy failure"
+        cp -a "$BACKUP_DIR/skills/." "$SKILLS_DIR/"
         echo "Restored skills from R2 backup"
     fi
 fi
@@ -156,17 +152,6 @@ config.agents.defaults = config.agents.defaults || {};
 config.agents.defaults.model = config.agents.defaults.model || {};
 config.gateway = config.gateway || {};
 config.channels = config.channels || {};
-
-// FORCE REMOVE INVALID KEYS
-// These keys are causing the binary to crash validation
-if ('reasoning' in config.agents.defaults.model) {
-    console.log('Removing invalid key: reasoning');
-    delete config.agents.defaults.model.reasoning;
-}
-if ('temperature' in config.agents.defaults.model) {
-    console.log('Removing invalid key: temperature');
-    delete config.agents.defaults.model.temperature;
-}
 
 // Clean up any broken anthropic provider config from previous runs
 // (older versions didn't include required 'name' field)
@@ -227,7 +212,7 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
 // Usage: Set AI_GATEWAY_BASE_URL or ANTHROPIC_BASE_URL to your endpoint like:
 //   https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/anthropic
 //   https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/openai
-const baseUrl = process.env.AI_GATEWAY_BASE_URL || process.env.ANTHROPIC_BASE_URL || '';
+const baseUrl = (process.env.AI_GATEWAY_BASE_URL || process.env.ANTHROPIC_BASE_URL || '').replace(/\/+$/, '');
 const isOpenAI = baseUrl.endsWith('/openai');
 
 if (isOpenAI) {
@@ -276,9 +261,11 @@ if (isOpenAI) {
     config.agents.defaults.models['anthropic/claude-haiku-4-5-20251001'] = { alias: 'Haiku 4.5' };
     config.agents.defaults.model.primary = 'anthropic/claude-opus-4-5-20251101';
 } else {
-    // Default to Kimi 2.5 (Recommended, thinking enabled by default)
-    config.agents.defaults.model.primary = 'moonshot/kimi-k2.5';
+    // Default to Anthropic without custom base URL (uses built-in pi-ai catalog)
+    config.agents.defaults.model.primary = 'anthropic/claude-opus-4-5';
 }
+
+// Write updated config
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 console.log('Configuration updated successfully');
 console.log('Config:', JSON.stringify(config, null, 2));
@@ -298,37 +285,10 @@ rm -f "$CONFIG_DIR/gateway.lock" 2>/dev/null || true
 BIND_MODE="lan"
 echo "Dev mode: ${CLAWDBOT_DEV_MODE:-false}, Bind mode: $BIND_MODE"
 
-# FIND CLAWDBOT BINARY
-CLAWDBOT_BIN=""
-if [ -f "/usr/local/bin/clawdbot" ]; then
-    CLAWDBOT_BIN="/usr/local/bin/clawdbot"
-elif [ -f "/usr/bin/clawdbot" ]; then
-    CLAWDBOT_BIN="/usr/bin/clawdbot"
-elif command -v clawdbot >/dev/null 2>&1; then
-    CLAWDBOT_BIN="$(command -v clawdbot)"
-else
-    # Try to find it via npm or other paths
-    echo "Searching for clawdbot binary..."
-    FOUND=$(find /usr -name clawdbot -type f -executable 2>/dev/null | head -n 1)
-    if [ -n "$FOUND" ]; then
-        CLAWDBOT_BIN="$FOUND"
-    fi
-fi
-
-if [ -z "$CLAWDBOT_BIN" ]; then
-    echo "ERROR: clawdbot binary not found!"
-    echo "PATH: $PATH"
-    echo "Listing /usr/local/bin:"
-    ls -la /usr/local/bin/
-    exit 127
-fi
-
-echo "Using clawdbot binary at: $CLAWDBOT_BIN"
-
 if [ -n "$CLAWDBOT_GATEWAY_TOKEN" ]; then
     echo "Starting gateway with token auth..."
-    exec "$CLAWDBOT_BIN" gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE" --token "$CLAWDBOT_GATEWAY_TOKEN"
+    exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE" --token "$CLAWDBOT_GATEWAY_TOKEN"
 else
     echo "Starting gateway with device pairing (no token)..."
-    exec "$CLAWDBOT_BIN" gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE"
+    exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE"
 fi
