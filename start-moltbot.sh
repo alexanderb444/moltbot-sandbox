@@ -270,23 +270,6 @@ if (isOpenAI) {
     config.agents.defaults.model.reasoning = 'on';
 }
 
-// Ensure Moonshot/Kimi provider has correct maxTokens settings (Best Practice: >= 16000)
-if (config.models && config.models.providers && config.models.providers.moonshot) {
-    console.log('Updating Moonshot provider settings for best practices...');
-    const moonshot = config.models.providers.moonshot;
-    if (moonshot.models) {
-        moonshot.models = moonshot.models.map(m => {
-            if (m.id.includes('kimi')) {
-                // Ensure sufficient tokens for thinking content
-                m.maxTokens = 32000; 
-                // Kimi 2.5 uses fixed temp 1.0, defaulting context window to high
-                m.contextWindow = 200000;
-            }
-            return m;
-        });
-    }
-}
-
 // Write updated config
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 console.log('Configuration updated successfully');
