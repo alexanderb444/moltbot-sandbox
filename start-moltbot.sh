@@ -8,6 +8,10 @@
 
 set -e
 
+# Ensure /usr/local/bin is in PATH
+export PATH=$PATH:/usr/local/bin
+echo "PATH is: $PATH"
+
 # Check if clawdbot gateway is already running - bail early if so
 # Note: CLI is still named "clawdbot" until upstream renames it
 if pgrep -f "clawdbot gateway" > /dev/null 2>&1; then
@@ -262,7 +266,8 @@ if (isOpenAI) {
     config.agents.defaults.model.primary = 'anthropic/claude-opus-4-5-20251101';
 } else {
     // Default to Anthropic without custom base URL (uses built-in pi-ai catalog)
-    config.agents.defaults.model.primary = 'anthropic/claude-opus-4-5';
+    // Default to Anthropic without custom base URL (uses built-in pi-ai catalog)
+    config.agents.defaults.model.primary = 'anthropic/claude-sonnet-4-5';
 }
 
 // Write updated config
@@ -287,8 +292,27 @@ echo "Dev mode: ${CLAWDBOT_DEV_MODE:-false}, Bind mode: $BIND_MODE"
 
 if [ -n "$CLAWDBOT_GATEWAY_TOKEN" ]; then
     echo "Starting gateway with token auth..."
-    exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE" --token "$CLAWDBOT_GATEWAY_TOKEN"
+    # Try multiple ways to run clawdbot
+    if [ -f "/usr/local/bin/clawdbot" ]; then
+        exec /usr/local/bin/clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE" --token "$CLAWDBOT_GATEWAY_TOKEN"
+    elif command -v clawdbot >/dev/null 2>&1; then
+        exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE" --token "$CLAWDBOT_GATEWAY_TOKEN"
+    else
+        echo "ERROR: clawdbot binary not found in PATH or /usr/local/bin"
+        echo "PATH: $PATH"
+        ls -la /usr/local/bin/
+        exit 127
+    fi
 else
     echo "Starting gateway with device pairing (no token)..."
-    exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE"
+    if [ -f "/usr/local/bin/clawdbot" ]; then
+        exec /usr/local/bin/clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE"
+    elif command -v clawdbot >/dev/null 2>&1; then
+        exec clawdbot gateway --port 18789 --verbose --allow-unconfigured --bind "$BIND_MODE"
+    else
+        echo "ERROR: clawdbot binary not found in PATH or /usr/local/bin"
+        echo "PATH: $PATH"
+        ls -la /usr/local/bin/
+        exit 127
+    fi
 fi
