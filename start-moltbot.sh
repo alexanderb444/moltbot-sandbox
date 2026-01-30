@@ -157,10 +157,16 @@ config.agents.defaults.model = config.agents.defaults.model || {};
 config.gateway = config.gateway || {};
 config.channels = config.channels || {};
 
-// CLEAN UP INVALID KEYS from previous backups
-// The binary doesn't support 'reasoning' or 'temperature' in this location yet
-if (config.agents.defaults.model.reasoning) delete config.agents.defaults.model.reasoning;
-if (config.agents.defaults.model.temperature) delete config.agents.defaults.model.temperature;
+// FORCE REMOVE INVALID KEYS
+// These keys are causing the binary to crash validation
+if ('reasoning' in config.agents.defaults.model) {
+    console.log('Removing invalid key: reasoning');
+    delete config.agents.defaults.model.reasoning;
+}
+if ('temperature' in config.agents.defaults.model) {
+    console.log('Removing invalid key: temperature');
+    delete config.agents.defaults.model.temperature;
+}
 
 // Clean up any broken anthropic provider config from previous runs
 // (older versions didn't include required 'name' field)
