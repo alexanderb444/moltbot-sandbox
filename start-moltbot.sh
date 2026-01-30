@@ -267,10 +267,7 @@ if (isOpenAI) {
 } else {
     // Default to Kimi 2.5 (Recommended, thinking enabled by default)
     config.agents.defaults.model.primary = 'moonshot/kimi-k2.5';
-    config.agents.defaults.model.reasoning = 'on';
 }
-
-// Write updated config
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 console.log('Configuration updated successfully');
 console.log('Config:', JSON.stringify(config, null, 2));
