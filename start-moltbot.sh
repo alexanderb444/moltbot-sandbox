@@ -230,24 +230,6 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
 const baseUrl = process.env.AI_GATEWAY_BASE_URL || process.env.ANTHROPIC_BASE_URL || '';
 const isOpenAI = baseUrl.endsWith('/openai');
 
-// Ensure Moonshot/Kimi provider has correct maxTokens settings (Best Practice: >= 16000)
-if (config.models && config.models.providers && config.models.providers.moonshot) {
-    console.log('Updating Moonshot provider settings for best practices...');
-    const moonshot = config.models.providers.moonshot;
-    if (moonshot.models) {
-        moonshot.models = moonshot.models.map(m => {
-            if (m.id.includes('kimi')) {
-                // Ensure sufficient tokens for thinking content
-                m.maxTokens = 32000; 
-                // Kimi 2.5 uses fixed temp 1.0, defaulting context window to high
-                m.contextWindow = 200000;
-                // Enable reasoning capability in provider definition
-                m.reasoning = true;
-            }
-            return m;
-        });
-    }
-}
 if (isOpenAI) {
     // Create custom openai provider config with baseUrl override
     // Omit apiKey so moltbot falls back to OPENAI_API_KEY env var
